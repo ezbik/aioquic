@@ -334,10 +334,14 @@ def print_response(
                 headers += k + b": " + v + b"\r\n"
             if headers:
                 print( 
-                    '+'*20 + 'Header START:\n'  +(headers).decode()         + '+'*20 + 'Header END' )
+                    '+'*20 + 'Header START:',  (headers).decode()         , '+'*20 + 'Header END' )
         elif isinstance(http_event, DataReceived):
+            try:
+                body_text=http_event.data.decode()
+            except:
+                body_text=http_event.data
             print(
-                    '+'*20 + 'Body START:\n'    + http_event.data.decode()  + '+'*20 + 'Body END' )
+                    '+'*20 + 'Body START:'    ,  body_text                 , '+'*20 + 'Body END' )
 
 def parse_headers(http_events: Deque[H3Event]) -> Dict:
     ret={}
