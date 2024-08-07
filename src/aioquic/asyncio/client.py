@@ -80,7 +80,8 @@ async def connect(
     )
 
     def parse_proxy_line(PX):
-        m=re.search(r'://(\w+):(\w+)@(\S+):(\w+)', PX)
+        PX=re.sub(r'.*://','',PX)
+        m=re.search(r'(\w+):(\w+)@(\S+):(\w+)', PX)
         if m:
             user=m.group(1)
             pwd= m.group(2)
@@ -88,7 +89,7 @@ async def connect(
             port=m.group(4)
             return addr, port, user, pwd
         else:
-            m=re.search(r'://(\S+):(\w+)', PX)
+            m=re.search(r'(\S+):(\w+)', PX)
             if m:
                 user=''
                 pwd= ''
