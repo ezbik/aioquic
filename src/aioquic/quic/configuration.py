@@ -88,6 +88,11 @@ class QuicConfiguration:
     .. note:: This is only used by clients.
     """
 
+    server_port: Optional[str] = None
+    """
+    The server port to use
+    """
+
     session_ticket: Optional[SessionTicket] = None
     """
     The TLS session ticket which should be used for session resumption.

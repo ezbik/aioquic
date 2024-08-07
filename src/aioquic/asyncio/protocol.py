@@ -119,7 +119,15 @@ class QuicConnectionProtocol(asyncio.DatagramProtocol):
 
         # send datagrams
         for data, addr in self._quic.datagrams_to_send(now=self._loop.time()):
-            self._transport.sendto(data, addr)
+            PX=1
+            if PX==1:
+                #print(dir ( self._quic ))
+                remote_host= self._quic.configuration.server_name
+                remote_port= self._quic.configuration.server_port
+                print(f'=> {remote_host}:{remote_port} {data[:5]}')
+                self._transport.sendto(data, (remote_host,  remote_port) )
+            else:
+                self._transport.sendto(data, addr)
 
         # re-arm timer
         timer_at = self._quic.get_timer()
@@ -153,6 +161,7 @@ class QuicConnectionProtocol(asyncio.DatagramProtocol):
 
     def datagram_received(self, data: Union[bytes, Text], addr: NetworkAddress) -> None:
         """:meta private:"""
+        print(f'<= {data[:5]}')
         self._quic.receive_datagram(cast(bytes, data), addr, now=self._loop.time())
         self._process_events()
         self.transmit()

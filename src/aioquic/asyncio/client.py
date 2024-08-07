@@ -1,5 +1,6 @@
 import asyncio
 import socket
+import socks
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Callable, Optional, cast
 
@@ -65,6 +66,8 @@ async def connect(
         configuration = QuicConfiguration(is_client=True)
     if configuration.server_name is None:
         configuration.server_name = host
+    if configuration.server_port is None:
+        configuration.server_port = port
     connection = QuicConnection(
         configuration=configuration,
         session_ticket_handler=session_ticket_handler,
@@ -81,6 +84,15 @@ async def connect(
     finally:
         if not completed:
             sock.close()
+
+    if 1==1:
+        print('     SOCKS5   ')
+        sock = socks.socksocket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.settimeout(10)
+        addr, port , user, pwd = '127.0.0.1', 1212, 'aaaaa', 'bbbbbbb'
+        rdns=True
+        sock.set_proxy(socks.SOCKS5, addr, int(port), rdns , user, pwd)
+
     # connect
     transport, protocol = await loop.create_datagram_endpoint(
         lambda: create_protocol(connection, stream_handler=stream_handler),
