@@ -80,10 +80,23 @@ async def connect(
     )
 
     def parse_proxy_line(PX):
-        addr, port =PX.split('@')[1].split(':')
-        user, pwd = PX.split('@')[0].split(':')[1:]
-        user=re.sub(r'^//', '', user)
-        return addr, port, user, pwd
+        m=re.search(r'://(\w+):(\w+)@(\S+):(\w+)', PX)
+        if m:
+            user=m.group(1)
+            pwd= m.group(2)
+            addr=m.group(3)
+            port=m.group(4)
+            return addr, port, user, pwd
+        else:
+            m=re.search(r'://(\S+):(\w+)', PX)
+            if m:
+                user=''
+                pwd= ''
+                addr=m.group(1)
+                port=m.group(2)
+                return addr, port, user, pwd
+            else:
+                return None,None,None,None
 
     if configuration.proxy:
         connection._logger.info(f"Connection through proxy {configuration.proxy}")
