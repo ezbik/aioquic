@@ -91,6 +91,8 @@ class QuicConfiguration:
     server_port: Optional[str] = None
     """
     The server port to use
+
+    .. note:: This is only used by clients.
     """
 
     session_ticket: Optional[SessionTicket] = None
@@ -101,6 +103,13 @@ class QuicConfiguration:
     token: bytes = b""
     """
     The address validation token that can be used to validate future connections.
+
+    .. note:: This is only used by clients.
+    """
+
+    proxy: Optional[str] = None
+    """
+    The Proxy server to use e.g. socks5://user:pass@host:port
 
     .. note:: This is only used by clients.
     """

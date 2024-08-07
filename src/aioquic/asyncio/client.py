@@ -1,6 +1,7 @@
 import asyncio
 import socket
 import socks
+import re
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Callable, Optional, cast
 
@@ -55,11 +56,15 @@ async def connect(
     loop = asyncio.get_event_loop()
     local_host = "::"
 
-    # lookup remote address
-    infos = await loop.getaddrinfo(host, port, type=socket.SOCK_DGRAM)
-    addr = infos[0][4]
-    if len(addr) == 2:
-        addr = ("::ffff:" + addr[0], addr[1], 0, 0)
+    if configuration.proxy:
+        pass
+        # don't resolve the Hostname; we want to pass the Hostname to the proxy and avoid DNS leak.
+    else:
+        # lookup remote address
+        infos = await loop.getaddrinfo(host, port, type=socket.SOCK_DGRAM)
+        addr = infos[0][4]
+        if len(addr) == 2:
+            addr = ("::ffff:" + addr[0], addr[1], 0, 0)
 
     # prepare QUIC connection
     if configuration is None:
@@ -74,24 +79,31 @@ async def connect(
         token_handler=token_handler,
     )
 
-    # explicitly enable IPv4/IPv6 dual stack
-    sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
-    completed = False
-    try:
-        sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
-        sock.bind((local_host, local_port, 0, 0))
-        completed = True
-    finally:
-        if not completed:
-            sock.close()
+    def parse_proxy_line(PX):
+        addr, port =PX.split('@')[1].split(':')
+        user, pwd = PX.split('@')[0].split(':')[1:]
+        user=re.sub(r'^//', '', user)
+        return addr, port, user, pwd
 
-    if 1==1:
-        print('     SOCKS5   ')
+    if configuration.proxy:
+        connection._logger.info(f"Connection through proxy {configuration.proxy}")
         sock = socks.socksocket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.settimeout(10)
-        addr, port , user, pwd = '127.0.0.1', 1212, 'aaaaa', 'bbbbbbb'
+        addr, port , user, pwd = parse_proxy_line( configuration.proxy )
         rdns=True
         sock.set_proxy(socks.SOCKS5, addr, int(port), rdns , user, pwd)
+    else:
+        connection._logger.info(f"Direct connection")
+        # explicitly enable IPv4/IPv6 dual stack
+        sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+        completed = False
+        try:
+            sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+            sock.bind((local_host, local_port, 0, 0))
+            completed = True
+        finally:
+            if not completed:
+                sock.close()
 
     # connect
     transport, protocol = await loop.create_datagram_endpoint(

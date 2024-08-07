@@ -248,6 +248,7 @@ async def perform_http_request(
     url: str,
     data: Optional[str],
     include: bool,
+    printdata: bool,
     output_dir: Optional[str],
 ) -> None:
     # perform request
@@ -273,9 +274,10 @@ async def perform_http_request(
     for http_event in http_events:
         if isinstance(http_event, DataReceived):
             octets += len(http_event.data)
+    respcode = parse_headers( http_events ).get(b':status')
     logger.info(
-        "Response received for %s %s : %d bytes in %.1f s (%.3f Mbps)"
-        % (method, urlparse(url).path, octets, elapsed, octets * 8 / elapsed / 1000000)
+        "Response received for %s %s : %s, %d bytes in %.1f s (%.3f Mbps)"
+        % (method, urlparse(url).path, respcode.decode(), octets, elapsed, octets * 8 / elapsed / 1000000)
     )
 
     # output response
@@ -287,7 +289,10 @@ async def perform_http_request(
             write_response(
                 http_events=http_events, include=include, output_file=output_file
             )
-
+    if printdata:
+        print_response(
+                http_events=http_events, include=include
+            )
 
 def process_http_pushes(
     client: HttpClient,
@@ -319,6 +324,29 @@ def process_http_pushes(
                     http_events=http_events, include=include, output_file=output_file
                 )
 
+def print_response(
+    http_events: Deque[H3Event],                        include: bool
+) -> None:
+    for http_event in http_events:
+        if isinstance(http_event, HeadersReceived) and include:
+            headers = b""
+            for k, v in http_event.headers:
+                headers += k + b": " + v + b"\r\n"
+            if headers:
+                print( 
+                    '+'*20 + 'Header START:\n'  +(headers).decode()         + '+'*20 + 'Header END' )
+        elif isinstance(http_event, DataReceived):
+            print(
+                    '+'*20 + 'Body START:\n'    + http_event.data.decode()  + '+'*20 + 'Body END' )
+
+def parse_headers(http_events: Deque[H3Event]) -> Dict:
+    ret={}
+    for http_event in http_events:
+        if isinstance(http_event, HeadersReceived):
+            for k, v in http_event.headers:
+                ret[k]=v
+
+    return ret
 
 def write_response(
     http_events: Deque[H3Event], output_file: BinaryIO, include: bool
@@ -332,7 +360,6 @@ def write_response(
                 output_file.write(headers + b"\r\n")
         elif isinstance(http_event, DataReceived):
             output_file.write(http_event.data)
-
 
 def save_session_ticket(ticket: SessionTicket) -> None:
     """
@@ -350,6 +377,7 @@ async def main(
     urls: List[str],
     data: Optional[str],
     include: bool,
+    printdata: bool,
     output_dir: Optional[str],
     local_port: int,
     zero_rtt: bool,
@@ -417,6 +445,7 @@ async def main(
                     url=url,
                     data=data,
                     include=include,
+                    printdata=printdata,
                     output_dir=output_dir,
                 )
                 for url in urls
@@ -465,6 +494,12 @@ if __name__ == "__main__":
         "--include",
         action="store_true",
         help="include the HTTP response headers in the output",
+    )
+    parser.add_argument(
+        "-p",
+        "--printdata",
+        action="store_true",
+        help="print result to stdout"
     )
     parser.add_argument(
         "--insecure",
@@ -538,6 +573,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--zero-rtt", action="store_true", help="try to send requests using 0-RTT"
     )
+    parser.add_argument(
+        "-x",
+        "--proxy",
+        type=str,
+        default='',
+        help="Socks5 proxy with UDP support e.g. socks5://user:pass@host:port"
+    )
 
     args = parser.parse_args()
 
@@ -585,6 +627,9 @@ if __name__ == "__main__":
         except FileNotFoundError:
             pass
 
+    if args.proxy:
+        configuration.proxy=args.proxy
+
     # load SSL certificate and key
     if args.certificate is not None:
         configuration.load_cert_chain(args.certificate, args.private_key)
@@ -597,6 +642,7 @@ if __name__ == "__main__":
             urls=args.url,
             data=args.data,
             include=args.include,
+            printdata=args.printdata,
             output_dir=args.output_dir,
             local_port=args.local_port,
             zero_rtt=args.zero_rtt,
