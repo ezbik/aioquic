@@ -56,29 +56,6 @@ async def connect(
     loop = asyncio.get_event_loop()
     local_host = "::"
 
-    if configuration.proxy:
-        pass
-        # don't resolve the Hostname; we want to pass the Hostname to the proxy and avoid DNS leak.
-    else:
-        # lookup remote address
-        infos = await loop.getaddrinfo(host, port, type=socket.SOCK_DGRAM)
-        addr = infos[0][4]
-        if len(addr) == 2:
-            addr = ("::ffff:" + addr[0], addr[1], 0, 0)
-
-    # prepare QUIC connection
-    if configuration is None:
-        configuration = QuicConfiguration(is_client=True)
-    if configuration.server_name is None:
-        configuration.server_name = host
-    if configuration.server_port is None:
-        configuration.server_port = port
-    connection = QuicConnection(
-        configuration=configuration,
-        session_ticket_handler=session_ticket_handler,
-        token_handler=token_handler,
-    )
-
     def parse_proxy_line(PX):
         PX=re.sub(r'.*://','',PX)
         m=re.search(r'(\w+):(\w+)@(\S+):(\w+)', PX)
@@ -98,6 +75,34 @@ async def connect(
                 return addr, port, user, pwd
             else:
                 return None,None,None,None
+
+    if configuration.proxy:
+        pass
+        # don't resolve the Hostname; we want to pass the Hostname to the proxy and avoid DNS leak.
+    else:
+        # lookup remote address
+        infos = await loop.getaddrinfo(host, port, type=socket.SOCK_DGRAM)
+        addr = infos[0][4]
+        if len(addr) == 2:
+            addr = ("::ffff:" + addr[0], addr[1], 0, 0)
+
+    # prepare QUIC connection
+    if configuration is None:
+        configuration = QuicConfiguration(is_client=True)
+    if configuration.server_name is None:
+        configuration.server_name = host
+    if configuration.server_port is None:
+        configuration.server_port = port
+    if configuration.proxy:
+        # adjust Quic machine to work with proxy
+        configuration.idle_timeout = 2
+        configuration.initial_rtt = 2
+
+    connection = QuicConnection(
+        configuration=configuration,
+        session_ticket_handler=session_ticket_handler,
+        token_handler=token_handler,
+    )
 
     if configuration.proxy:
         connection._logger.info(f"Connection through proxy {configuration.proxy}")
